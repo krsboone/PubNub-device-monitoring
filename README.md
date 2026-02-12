@@ -2,7 +2,7 @@
 
 ## Details
 
-Set of tools that are used to monitor the availability of a device.
+Set of tools that are used to monitor the availability of a device. This is the initial draft for what I hope will be toolset capable of providing more robust device monitoring.
 
 `heartbeat.py` 
 * Runs on the device to be monitored
