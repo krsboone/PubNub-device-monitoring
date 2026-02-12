@@ -17,8 +17,8 @@ Set of tools that are used to monitor the availability of a device. This is the 
 * If not needed, then remove `from log_cap import start_logging` and the `start_logging` function from `monitor.py`
 
 `monitor.py`
-* Subscribes to PubNub channel that the devices send the hearbeat messages to
-* Builds a dict from the hostname of each device sending the hearbeat message, and the heartbeat time
+* Subscribes to PubNub channel that devices send the hearbeat messages to
+* Builds a dict of the hostname from each device sending the hearbeat message, and the heartbeat time
 * If time threshold is exceeded, device is deemed offline
 * When device is offline a message is sent to the channel including the hostname and time, and that same information is logged
 
