@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PubNub | Availability Monitoring</title>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
+    <style>
+        :root { --red: #ff4d4d; --green: #2ecc71; --gray: #bdc3c7; --dark: #2d3436; }
+        body { font-family: 'Inter', sans-serif; background: #f0f2f5; padding: 40px; color: var(--dark); }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        #debug-status { font-size: 12px; background: #dfe6e9; padding: 5px 10px; border-radius: 4px; font-weight: bold; }
+
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            align-items: start;
+        }
+
+        .card {
+            background: white; padding: 25px; border-radius: 12px;
+            border-top: 8px solid var(--gray); cursor: pointer; transition: 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .card.online { border-top-color: var(--green); }
+        .card.offline { border-top-color: var(--red); }
+
+        .status-label { font-size: 11px; font-weight: 900; letter-spacing: 1px; margin-bottom: 5px; }
+        .name { font-weight: 800; font-size: 1.4em; margin-bottom: 8px; }
+        .time-counter { font-size: 13px; color: #636e72; }
+
+        .offline-log {
+            display: none;
+            margin-top: 15px; padding-top: 12px;
+            border-top: 1px solid #eee; font-size: 12px;
+        }
+        /* Only show log when card has expanded class */
+        .card.expanded .offline-log { display: block; }
+
+        .log-entry { margin-bottom: 4px; color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>Availability Monitoring</h1>
+            <p>Real-time Device Monitoring & Incident Logging</p>
+        </div>
+        <div id="debug-status">Initializing System...</div>
+    </div>
+
+    <div class="device-grid" id="grid"></div>
+
+    <script>
+        const pubnub = new PubNub({
+            publishKey: 'pub-key-here',
+            subscribeKey: 'sub-key-here',
+            userId: 'availability_monitor_' + Math.floor(Math.random() * 1000)
+        });
+
+        const MAIN_CHANNEL = "availability_monitor";
+        const LOG_PREFIX = "incident_logs.";
+        let registry = {};
+
+        async function initDashboard() {
+            const debug = document.getElementById('debug-status');
+            try {
+                // 1. Get all registered members
+                const response = await pubnub.objects.getChannelMembers({
+                    channel: MAIN_CHANNEL,
+                    include: { includeUUIDDetails: true }
+                });
+                const membersList = response.data || [];
+
+                // 2. Get recent heartbeats to establish initial state
+                const history = await pubnub.fetchMessages({ channels: [MAIN_CHANNEL], count: 50 });
+                const historyMsgs = history.channels[MAIN_CHANNEL] || [];
+
+                registry = {};
+                membersList.forEach(m => {
+                    const id = m.uuid.id;
+                    const lastMsg = historyMsgs.slice().reverse().find(msg => msg.message.id === id);
+
+                    registry[id] = {
+                        id: id,
+                        lastSeen: lastMsg ? Math.floor(lastMsg.timetoken / 10000) : 0,
+                        isOffline: true,      // Current visual state
+                        lastReported: true,   // Tracks if already sent the 'Offline' log
+                        isExpanded: false,
+                        logs: []
+                    };
+                });
+
+                debug.innerText = `Nodes Registered: ${membersList.length}`;
+                render();
+            } catch (e) {
+                console.error("Init Error:", e);
+                debug.innerText = "Connection Error";
+            }
+        }
+
+        // Send incident report to a dedicated device channel
+        async function reportIncident(id) {
+            const timestamp = new Date().toLocaleString();
+            console.log(`📡 LOGGING INCIDENT: ${id} went offline at ${timestamp}`);
+            try {
+                await pubnub.publish({
+                    channel: LOG_PREFIX + id,
+                    message: { event: "DISCONNECT", timestamp: timestamp, id: id }
+                });
+                // After reporting, fetch logs immediately to refresh the UI
+                if (registry[id].isExpanded) loadDeviceLogs(id);
+            } catch (e) {
+                console.error("Failed to publish incident:", e);
+            }
+        }
+
+        async function loadDeviceLogs(id) {
+            try {
+                const result = await pubnub.fetchMessages({ channels: [LOG_PREFIX + id], count: 10 });
+                registry[id].logs = (result.channels[LOG_PREFIX + id] || []).reverse();
+                render();
+            } catch (e) { console.error("History fetch error:", e); }
+        }
+
+        pubnub.subscribe({ channels: [MAIN_CHANNEL] });
+
+        pubnub.addListener({
+            message: (event) => {
+                const id = event.message.id;
+                if (event.message.type === 'heartbeat' && registry[id]) {
+                    registry[id].lastSeen = Date.now();
+                    registry[id].isOffline = false;
+                    registry[id].lastReported = false; // Reset so we can log the next disconnect
+                    render();
+                }
+            }
+        });
+
+        function render() {
+            const grid = document.getElementById('grid');
+            const now = Date.now();
+
+            Object.keys(registry).forEach(id => {
+                let card = document.getElementById(`card-${id}`);
+                const isOnlineNow = (now - registry[id].lastSeen) < 7000;
+
+                // --- TRANSITION LOGIC ---
+                // If it just went offline and haven't reported it yet...
+                if (!isOnlineNow && !registry[id].lastReported) {
+                    registry[id].isOffline = true;
+                    registry[id].lastReported = true; // Mark as reported
+                    reportIncident(id);
+                }
+
+                if (!card) {
+                    card = document.createElement('div');
+                    card.id = `card-${id}`;
+                    card.onclick = () => {
+                        registry[id].isExpanded = !registry[id].isExpanded;
+                        if (registry[id].isExpanded) loadDeviceLogs(id);
+                        render();
+                    };
+                    grid.appendChild(card);
+                }
+
+                card.className = `card ${isOnlineNow ? 'online' : 'offline'} ${registry[id].isExpanded ? 'expanded' : ''}`;
+
+                const logHTML = registry[id].logs.length > 0 ?
+                    registry[id].logs.map(m => `<div class="log-entry">🔴 ${m.message.timestamp}</div>`).join('') :
+                    '<div style="color:#999">No recent incidents.</div>';
+
+                card.innerHTML = `
+                    <div class="status-label" style="color: ${isOnlineNow ? 'var(--green)' : 'var(--red)'}">
+                        ${isOnlineNow ? '● ACTIVE' : '○ DISCONNECTED'}
+                    </div>
+                    <div class="name">${id}</div>
+                    <div class="time-counter">${isOnlineNow ? 'Pulse Nominal' : 'No Signal detected'}</div>
+                    <div class="offline-log">
+                        <strong>Recent Outages</strong>
+                        <div style="margin-top:8px;">${logHTML}</div>
+                    </div>
+                `;
+            });
+        }
+
+        initDashboard();
+        setInterval(render, 2000);
+    </script>
+</body>
+</html>
