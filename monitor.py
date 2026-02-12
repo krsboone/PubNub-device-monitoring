@@ -39,7 +39,6 @@ class MonitorCallback(SubscribeCallback):
 def report_incident(node_id):
     # Using datetime for more flexible 12-hour clock formatting
     now = datetime.datetime.now()
-
     # Format: 2/10/2026, 4:56:10 PM
     timestamp = now.strftime("%-m/%-d/%Y, %-I:%M:%S %p")
     # For now removing conditional check due to race conditions when multiple devices are running
@@ -60,8 +59,6 @@ print("--- PubNub | Availability Monitoring  ---")
 try:
     while True:
         now = time.time()
-        # validate that dict isn't growing out of control
-        # print(len(registry))
         for node_id, data in registry.items():
             # Check for timeout
             #print(data)
