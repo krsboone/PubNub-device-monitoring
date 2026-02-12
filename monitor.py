@@ -37,7 +37,6 @@ class MonitorCallback(SubscribeCallback):
                 }
 
 def report_incident(node_id):
-    # PagerDuty alert could be triggered here
     # Using datetime for more flexible 12-hour clock formatting
     now = datetime.datetime.now()
 
