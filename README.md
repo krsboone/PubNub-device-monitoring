@@ -12,7 +12,7 @@ Set of tools that are used to monitor the availability of a device. This is the 
 
 `log_cap.py`
 * Optional
-* A simple logging wrapper that is used by the monitoring agent
+* A simple logging wrapper used by the monitoring agent
 * Writes to `log/`
 * If not needed, then remove the `start_logging` function from `monitor.py`
 
