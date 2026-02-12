@@ -1,5 +1,6 @@
 # PubNub-device-monitoring
 
+
 ## Details
 
 Set of tools that are used to monitor the availability of a device. This is the initial draft for what I hope will be toolset capable of providing more robust device monitoring.
@@ -29,6 +30,7 @@ Set of tools that are used to monitor the availability of a device. This is the 
 * Will also send a message when a device is determined to be offline. If both `dashboard.html` and `monitor.py` are running, each will send this message resulting in two offline messages for the single event. This is noted for future improvement.
 * The card for each device can be expanded to show a history of offline events
 
+
 ## Config
 
 Replace
@@ -43,9 +45,11 @@ Install PubNub Python SDK
 `pip install 'pubnub>=10.6.1'`
 https://www.pubnub.com/docs/sdks/python
 
+
 ## Recording
 
 https://youtu.be/TOBEw8KR8wY
+
 
 ## Todo
 
