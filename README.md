@@ -56,4 +56,4 @@ https://youtu.be/TOBEw8KR8wY
 1. Add ability to turn the monitoring functionality on/off on the dashboard (default should be off). Currently, if both the dashboard and monitor.py are running, there will be 2 offline events create for a single occurrence of a device going offline.
 2. Add functionality to track additional device status metrics.
 3. Add ability to purge outage history data from dashboard.
-4. Strict userIDs vs randomly generated
+4. ~~Strict userIDs vs randomly generated~~
