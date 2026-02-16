@@ -39,9 +39,48 @@
         .card.expanded .offline-log { display: block; }
 
         .log-entry { margin-bottom: 4px; color: #e74c3c; }
+
+        /* Username modal */
+        #username-modal {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+        #username-modal .modal-box {
+            background: white; border-radius: 12px; padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            width: 360px; text-align: center;
+        }
+        #username-modal h2 { margin: 0 0 8px; font-size: 1.4em; }
+        #username-modal p { margin: 0 0 24px; color: #636e72; font-size: 14px; }
+        #username-input {
+            width: 100%; box-sizing: border-box;
+            padding: 10px 14px; font-size: 15px;
+            border: 2px solid #dfe6e9; border-radius: 8px;
+            outline: none; margin-bottom: 16px;
+        }
+        #username-input:focus { border-color: var(--dark); }
+        #username-modal button {
+            width: 100%; padding: 11px;
+            background: var(--dark); color: white;
+            border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+        }
+        #username-modal button:hover { background: #636e72; }
     </style>
 </head>
 <body>
+
+    <!-- Username prompt -->
+    <div id="username-modal">
+        <div class="modal-box">
+            <h2>Welcome</h2>
+            <p>Enter a username to continue</p>
+            <input type="text" id="username-input" placeholder="Your username..." />
+            <button onclick="startDashboard()">Continue</button>
+        </div>
+    </div>
 
     <div class="header">
         <div>
@@ -54,15 +93,50 @@
     <div class="device-grid" id="grid"></div>
 
     <script>
-        const pubnub = new PubNub({
-            publishKey: 'pub-key-here',
-            subscribeKey: 'sub-key-here',
-            userId: 'availability_monitor_' + Math.floor(Math.random() * 1000)
-        });
+        let pubnub;
 
         const MAIN_CHANNEL = "availability_monitor";
         const LOG_PREFIX = "incident_logs.";
         let registry = {};
+
+        function startDashboard() {
+            const input = document.getElementById('username-input');
+            const username = input.value.trim();
+            if (!username) {
+                input.focus();
+                return;
+            }
+
+            document.getElementById('username-modal').style.display = 'none';
+
+            pubnub = new PubNub({
+                publishKey: 'pub-key-here',
+                subscribeKey: 'sub-key-here',
+                userId: 'availability_monitor_' + username
+            });
+
+            pubnub.subscribe({ channels: [MAIN_CHANNEL] });
+
+            pubnub.addListener({
+                message: (event) => {
+                    const id = event.message.id;
+                    if (event.message.type === 'heartbeat' && registry[id]) {
+                        registry[id].lastSeen = Date.now();
+                        registry[id].isOffline = false;
+                        registry[id].lastReported = false; // Reset so we can log the next disconnect
+                        render();
+                    }
+                }
+            });
+
+            initDashboard();
+            setInterval(render, 2000);
+        }
+
+        // Allow pressing Enter in the input to submit
+        document.getElementById('username-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') startDashboard();
+        });
 
         async function initDashboard() {
             const debug = document.getElementById('debug-status');
@@ -125,20 +199,6 @@
             } catch (e) { console.error("History fetch error:", e); }
         }
 
-        pubnub.subscribe({ channels: [MAIN_CHANNEL] });
-
-        pubnub.addListener({
-            message: (event) => {
-                const id = event.message.id;
-                if (event.message.type === 'heartbeat' && registry[id]) {
-                    registry[id].lastSeen = Date.now();
-                    registry[id].isOffline = false;
-                    registry[id].lastReported = false; // Reset so we can log the next disconnect
-                    render();
-                }
-            }
-        });
-
         function render() {
             const grid = document.getElementById('grid');
             const now = Date.now();
@@ -185,9 +245,6 @@
                 `;
             });
         }
-
-        initDashboard();
-        setInterval(render, 2000);
     </script>
 </body>
 </html>
