@@ -5,8 +5,6 @@ import argparse
 from pubnub.pnconfiguration import PNConfiguration
 from pubnub.pubnub import PubNub
 
-# The "Final Boss" Wrapper - Nesting the UUID correctly
-# I struggled here a bit; open to suggestions
 class MemberWrapper:
     def __init__(self, id_val):
         self.id_val = id_val
@@ -16,6 +14,32 @@ class MemberWrapper:
                 "id": self.id_val
             }
         }
+
+def initialize_pubnub_metadata(pn_client, channel_id, hostname):
+    """
+    Ensures both Channel and User (UUID) metadata exist.
+    Required for brand-new keysets before 'joining' can work.
+    """
+    # 1. Register the Channel Metadata
+    try:
+        pn_client.set_channel_metadata() \
+            .channel(channel_id) \
+            .set_name("Device Availability Monitor") \
+            .sync()
+        print(f"✅ Channel '{channel_id}' initialized.")
+    except Exception as e:
+        print(f"Channel Metadata Note: {e}")
+
+    # 2. Register the UUID (User) Metadata
+    # On new keys, the User must exist before being added to a channel
+    try:
+        pn_client.set_uuid_metadata() \
+            .uuid(hostname) \
+            .set_name(f"Node: {hostname}") \
+            .sync()
+        print(f"✅ User/Device '{hostname}' initialized.")
+    except Exception as e:
+        print(f"User Metadata Note: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Device Monitor")
@@ -33,12 +57,13 @@ def main():
 
     channel = "availability_monitor"
 
+    # Updated: Now passing hostname to initialize user metadata too
+    initialize_pubnub_metadata(pubnub, channel, hostname)
+
     if args.action == 'join':
         print(f"--- Joining Monitor Network as: {hostname} ---")
         try:
             member_wrapper = MemberWrapper(hostname)
-
-            # Device added as channel member
             pubnub.set_channel_members() \
                 .channel(channel) \
                 .uuids([member_wrapper]) \
@@ -49,7 +74,6 @@ def main():
 
         try:
             while True:
-                # Utilizing this way of sending the "heartbeat" to allow for feature expansion
                 pubnub.publish().channel(channel).message({
                     "type": "heartbeat", "id": hostname
                 }).sync()
